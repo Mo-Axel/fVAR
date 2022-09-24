@@ -13,32 +13,32 @@ using LinearAlgebra
 # include Functions
 #-------------------------------------------------------------
 #cd("$(pwd())/Dropbox/Heterogeneity/Software/Empirical_Analysis/")
-readDir = "$(pwd())/CB-fVAR/OVERALL/Functions/"
+readDir = "$(pwd())/Functions/"
 include(readDir *"logSpline_Procedures.jl");
 
 #-------------------------------------------------------------
 # load data
 #-------------------------------------------------------------
-dataDir = "$(pwd())/CB-fVAR/OVERALL/Data/"
+dataDir = "$(pwd())/data/"
 
-year_data     = CSV.read(dataDir * "No_superrate.csv", DataFrame, header = true);
-li_ty_data   = CSV.read(dataDir * "C_3_line.csv", DataFrame, header = true);
+#unrate_data     = CSV.read(dataDir * "UNRATE_CPS_FRED.csv", DataFrame, header = true);
+Lli_ty_data   = CSV.read(dataDir * "all_data.csv", DataFrame, header = true);
 
-
-period_year = convert(Array, year_data[:,1])
-li_ty_detrended = convert(Array,li_ty_data[:,3])
-li_ty_t = convert(Array,li_ty_data[:,2])
-Tend       = length(period_year)
+unrate     = convert(Array,unrate_data[:,2])
+period_UNR = convert(Array, unrate_data[:,1])
+Lli_ty = convert(Array,Lli_ty_data[:,3])
+Lli_ty_t = convert(Array,Lli_ty_data[:,2])
+Tend       = length(unrate)
 
 #-------------------------------------------------------------
 # choose specification file
 #-------------------------------------------------------------
 nfVARSpec = "10tc"
-specDir   = "$(pwd())/CB-fVAR/OVERALL/SpecFiles/"
+specDir   = "$(pwd())/SpecFiles/"
 include(specDir * "/fVARspec" * nfVARSpec * ".jl")
 
 # subsequently use the same knots regardless of sample size N,T
-knots_all = quantile(li_ty_detrended, quant_vec)
+knots_all = quantile(earnings_detrended, quant_vec)
 
 #-------------------------------------------------------------
 # log spline density estimation over K and t
@@ -65,8 +65,8 @@ for ii = 1:K_vec_n
         Period_all[tt] = timeidx
 
         # time t data
-        selecteddraws_t = li_ty_detrended[li_ty_t.==timeidx]
-        timeidx = timeidx + 1
+        selecteddraws_t = earnings_detrended[earnings_t.==timeidx]
+        timeidx = timeidx + 3
         N_all[tt]       = length(selecteddraws_t)
 
         # count observations with knot restriction
@@ -123,7 +123,7 @@ for ii = 1:K_vec_n
 
         # results
         PhatDensCoef[tt,:]  = coef_t
-        PhatDensNorm[tt,:]  = lnpdfNormalize(coef_t', knots, minimum(xgrid), maximum(xgrid))
+        PhatDensNorm[tt,:]  = lnpdfNormalize_unrate(coef_t',knots, unrate, minimum(xgrid), maximum(xgrid))
         PhatDensValue[tt,:] = pdfEval(xgrid,coef_t,knots,[PhatDensNorm[tt,1]])';
         N_details[tt,:]     = [N_all[tt] N_max pi_hat C_topcode N_knots]
 
@@ -156,7 +156,7 @@ for ii = 1:K_vec_n
     end
 
     # seasonality adjustment
-    nq = 1 # quarterly data
+    nq = 4 # quarterly data
     start_season = 1 # starting from 1989Q1 (first quarter)
     (PhatDensCoef_adj, PhatDensCoef_mean, PhatDensCoef_mean_allt) = seasonality_adj(PhatDensCoef, nq, start_season, Tend)
 
@@ -180,7 +180,7 @@ for ii = 1:K_vec_n
     # save results
     sNameDir  = "fVAR" * nfVARSpec
     sNameFile = "K" * string(K) * "_fVAR" * nfVARSpec
-    savedir = "$(pwd())/CB-fVAR/OVERALL/results/" * sNameDir *"/";
+    savedir = "$(pwd())/results/" * sNameDir *"/";
     try mkdir(savedir) catch; end
     CSV.write(savedir * sNameFile * "_DensityPeriod.csv", DataFrame(Period_all,:auto))
     CSV.write(savedir * sNameFile * "_PhatDensValue.csv", DataFrame(PhatDensValue,:auto))
@@ -194,12 +194,11 @@ for ii = 1:K_vec_n
     CSV.write(savedir * sNameFile * "_N_details.csv", DataFrame(N_details,:auto))
     CSV.write(savedir * sNameFile * "_MDD_GoF.csv", DataFrame(MDD_GoF,:auto))
 
-
 end
 
 sNameDir  = "fVAR" * nfVARSpec;
 sNameFile = "fVAR" * nfVARSpec;
-savedir = "$(pwd())/CB-fVAR/OVERALL/results/" * sNameDir *"/";
+savedir = "$(pwd())/results/" * sNameDir *"/";
 try mkdir(savedir) catch; end
 CSV.write(savedir * sNameFile * "_MDD_GoF_sum.csv", DataFrame(MDD_GoF_sum,:auto))
 CSV.write(savedir * sNameFile * "_knots_all.csv", DataFrame(knots_all',:auto))

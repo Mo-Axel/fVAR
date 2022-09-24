@@ -1,27 +1,27 @@
-function phatEval(x,PhatDensCoef, knots, xgrid)
+function phatEval(x,PhatDensCoef, knots, unrate, xgrid)
     # compute normalization constant of cross-sectional density, density normalizes to 1-unempl.
     #PhatDensCoef_tt    = coefRecover(statepmean_tt',PhatDensCoef_lambda, PhatDensCoef_mean)
 #    PhatDensCoef_tt    = lnpdfNormalize_unrate(PhatDensCoef_tt, knots, (statepmean_t[3] + mean(UNR)),0,3)
-    PhatDensNorm    = lnpdfNormalize(PhatDensCoef, knots, minimum(xgrid),maximum(xgrid))
+    PhatDensNorm    = lnpdfNormalize_unrate(PhatDensCoef, knots, unrate, minimum(xgrid),maximum(xgrid))
     #PhatDensNorm    = lnpdfNormalize_unrate_Rsum(PhatDensCoef, knots, unrate, minimum(xgrid),maximum(xgrid))
     out             = exp.((basis_logspline(x,knots)*PhatDensCoef')[1] - PhatDensNorm[1])
     return out
 end
 
-function phatIntegrate(PhatDensCoef, knots, xgrid, lb, ub)
+function phatIntegrate(PhatDensCoef, knots, unrate, xgrid, lb, ub)
     # integrate normalized density from lb to ub. Here normalized density integrates to 1-u
-    (Intout,error) = quadgk(x -> phatEval(x,PhatDensCoef, knots, xgrid), lb, ub)
+    (Intout,error) = quadgk(x -> phatEval(x,PhatDensCoef, knots, unrate, xgrid), lb, ub)
     return Intout
 end
 
-function phatIntegrate_lmass(PhatDensCoef, knots, xgrid, lb, ub)
+function phatIntegrate_lmass(PhatDensCoef, knots, unrate, xgrid, lb, ub)
     # integrate normalized density from lb to ub. Add unemployment rate to integral so that overall density would normalize to one
-    (Intout,error) = quadgk(x -> phatEval(x,PhatDensCoef, knots, xgrid),lb, ub)
-    Intout = Intout
+    (Intout,error) = quadgk(x -> phatEval(x,PhatDensCoef, knots, unrate, xgrid),lb, ub)
+    Intout = Intout + unrate
     return Intout
 end
 
-function DensPercentiles(PhatDensCoef, knots, xgrid, grid_temp, vec_percs)
+function DensPercentiles(PhatDensCoef, knots, unrate, xgrid, grid_temp, vec_percs)
 
     valuesIntegrate = zeros(length(grid_temp)-1,1)
 
@@ -30,9 +30,9 @@ function DensPercentiles(PhatDensCoef, knots, xgrid, grid_temp, vec_percs)
         # nn=2 corresponds to the first non-zero grid value
         if nn  == 2
             # add unemployment rate to cdf (mass of individuals earning zero)
-            valuesIntegrate[nn-1] = phatIntegrate_lmass(PhatDensCoef, knots, xgrid, grid_temp[nn-1], grid_temp[nn])[1]
+            valuesIntegrate[nn-1] = phatIntegrate_lmass(PhatDensCoef, knots, unrate, xgrid, grid_temp[nn-1], grid_temp[nn])[1]
         else
-            valuesIntegrate[nn-1] = phatIntegrate(PhatDensCoef, knots, xgrid, grid_temp[nn-1], grid_temp[nn])[1]
+            valuesIntegrate[nn-1] = phatIntegrate(PhatDensCoef, knots, unrate, xgrid, grid_temp[nn-1], grid_temp[nn])[1]
         end
     end
 
@@ -44,8 +44,8 @@ function DensPercentiles(PhatDensCoef, knots, xgrid, grid_temp, vec_percs)
         emp_percs[pp] = itp(vec_percs[pp])
     end
 
-    #theta = 1.0
-    #emp_percs = 1/(2*theta)*(exp.(theta*emp_percs) - exp.(-theta*emp_percs))
+    theta = 1.0
+    emp_percs = 1/(2*theta)*(exp.(theta*emp_percs) - exp.(-theta*emp_percs))
 
     return emp_percs
 
